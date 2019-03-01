@@ -67,6 +67,7 @@ float fbmPerlin(vec2 pos, float octaves, float seed) {
 void main() {
   float t = fbmPerlin(fs_Pos * 1.5, 1.f, 0.238);
   t = 1.f - t;
-  vec3 col = mix(vec3(0), vec3(78, 1, 1) * 2.5 / 255.f, t);
+  t = smoothstep(0.25, 0.75, t);
+  vec3 col = mix(vec3(0), vec3(78, 1, 1) * 4.f / 255.f, t);
   out_Col = vec4(col * 0.3, 1);
 }

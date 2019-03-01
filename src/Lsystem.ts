@@ -252,9 +252,9 @@ class Lsystem {
         this.transform4pArray.push(t[14]);
         this.transform4pArray.push(t[15]);
 
-        this.colorspArray.push(this.turtle.color[0]);
-        this.colorspArray.push(this.turtle.color[1]);
-        this.colorspArray.push(this.turtle.color[2]);
+        this.colorspArray.push(this.turtle.color[0] * 2);
+        this.colorspArray.push(this.turtle.color[1] * 2);
+        this.colorspArray.push(this.turtle.color[2] * 2);
         this.colorspArray.push(this.turtle.color[3]);
         
         this.persons++;
