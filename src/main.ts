@@ -1,14 +1,15 @@
 import * as Stats from 'stats-js';
 import * as DAT from 'dat-gui';
-import Square from './geometry/Square';
-import ScreenQuad from './geometry/ScreenQuad';
-import OpenGLRenderer from './rendering/gl/OpenGLRenderer';
-import Lsystem from './Lsystem';
 import Camera from './Camera';
 import {setGL, readTextFile} from './globals';
-import ShaderProgram, {Shader} from './rendering/gl/ShaderProgram';
-import Mesh from './geometry/Mesh';
 import {vec3, mat4} from 'gl-matrix';
+import Square from './geometry/Square';
+import ScreenQuad from './geometry/ScreenQuad';
+import Mesh from './geometry/Mesh';
+import OpenGLRenderer from './rendering/gl/OpenGLRenderer';
+import ShaderProgram, {Shader} from './rendering/gl/ShaderProgram';
+import PlantSystem from './PlantSystem';
+import LSystem from './Lsystem';
 
 // Define an object with application parameters and button callbacks
 // This will be referred to by dat.GUI's functions that add GUI elements.
@@ -22,7 +23,11 @@ let square: Square;
 let screenQuad: ScreenQuad;
 let time: number = 0.0;
 
-let lsystem: Lsystem;
+let lsystem: LSystem;
+let cube: Mesh;
+let meshes: Mesh[] = [];
+
+let plantSystem: PlantSystem;
 let cylinder: Mesh;
 let person: Mesh;
 let plane: Mesh;
@@ -37,33 +42,56 @@ function loadScene() {
   screenQuad = new ScreenQuad();
   screenQuad.create();
 
-  let obj0: string = readTextFile('./cylinder.obj');
-  cylinder = new Mesh(obj0, vec3.fromValues(0, 0, 0));
-  cylinder.create();
-  let obj1: string = readTextFile('./person.obj');
-  person = new Mesh(obj1, vec3.fromValues(0, 0, 0));
-  person.create();
-  lsystem = new Lsystem("TF", 30, 20, 20, 5);
+  let obj0: string = readTextFile('./cube.obj');
+  cube = new Mesh(obj0, vec3.fromValues(0, 0, 0));
+  cube.create();
+  meshes.push(cube);
+
+  lsystem = new LSystem("T", 0);
   lsystem.traverse();
 
-  let transform1: Float32Array = new Float32Array(lsystem.transform1Array);
-  let transform2: Float32Array = new Float32Array(lsystem.transform2Array);
-  let transform3: Float32Array = new Float32Array(lsystem.transform3Array);
-  let transform4: Float32Array = new Float32Array(lsystem.transform4Array);
-  let color: Float32Array = new Float32Array(lsystem.colorsArray);
+  let transforms1 = lsystem.getTransform1Arrays();
+  let transforms2 = lsystem.getTransform2Arrays();
+  let transforms3 = lsystem.getTransform3Arrays();
+  let transforms4 = lsystem.getTransform4Arrays();
+  let colors = lsystem.getColorsArrays();
+  for(let i = 0; i < meshes.length; i++) {
+    let t1 = new Float32Array(transforms1[i]);
+    let t2 = new Float32Array(transforms2[i]);
+    let t3 = new Float32Array(transforms3[i]);
+    let t4 = new Float32Array(transforms4[i]);
+    let c = new Float32Array(colors[i]);
+    meshes[i].setInstanceVBOs(t1, t2, t3, t4, c);
+    meshes[i].setNumInstances(lsystem.getNums()[i]);
+  }
+
+  let obj1: string = readTextFile('./cylinder.obj');
+  cylinder = new Mesh(obj1, vec3.fromValues(0, 0, 0));
+  cylinder.create();
+  let obj2: string = readTextFile('./person.obj');
+  person = new Mesh(obj2, vec3.fromValues(0, 0, 0));
+  person.create();
+  /*plantSystem = new PlantSystem("TF", 30, 20, 20, 5);
+  plantSystem.traverse();
+
+  let transform1: Float32Array = new Float32Array(plantSystem.transform1Array);
+  let transform2: Float32Array = new Float32Array(plantSystem.transform2Array);
+  let transform3: Float32Array = new Float32Array(plantSystem.transform3Array);
+  let transform4: Float32Array = new Float32Array(plantSystem.transform4Array);
+  let color: Float32Array = new Float32Array(plantSystem.colorsArray);
   cylinder.setInstanceVBOs(transform1, transform2, transform3, transform4, color);
-  cylinder.setNumInstances(lsystem.cylinders);
+  cylinder.setNumInstances(plantSystem.cylinders);
 
-  let transform1p: Float32Array = new Float32Array(lsystem.transform1pArray);
-  let transform2p: Float32Array = new Float32Array(lsystem.transform2pArray);
-  let transform3p: Float32Array = new Float32Array(lsystem.transform3pArray);
-  let transform4p: Float32Array = new Float32Array(lsystem.transform4pArray);
-  let colorp: Float32Array = new Float32Array(lsystem.colorspArray);
+  let transform1p: Float32Array = new Float32Array(plantSystem.transform1pArray);
+  let transform2p: Float32Array = new Float32Array(plantSystem.transform2pArray);
+  let transform3p: Float32Array = new Float32Array(plantSystem.transform3pArray);
+  let transform4p: Float32Array = new Float32Array(plantSystem.transform4pArray);
+  let colorp: Float32Array = new Float32Array(plantSystem.colorspArray);
   person.setInstanceVBOs(transform1p, transform2p, transform3p, transform4p, colorp);
-  person.setNumInstances(lsystem.persons);
+  person.setNumInstances(plantSystem.persons);*/
 
-  let obj2: string = readTextFile('./plane.obj');
-  plane = new Mesh(obj2, vec3.fromValues(0, 0, 0));
+  let obj3: string = readTextFile('./plane.obj');
+  plane = new Mesh(obj3, vec3.fromValues(0, 0, 0));
   plane.create();
   let a1 = [1, 0, 0, 0];
   let a2 = [0, 1, 0, 0];
@@ -98,9 +126,9 @@ function loadScene() {
       colorsArray.push(1.0); // Alpha channel
     }
   }
-  let offsets: Float32Array = new Float32Array(offsetsArray);
-  let colors: Float32Array = new Float32Array(colorsArray);
-  square.setInstanceVBOs(offsets, colors);
+  let sOffsets: Float32Array = new Float32Array(offsetsArray);
+  let sColors: Float32Array = new Float32Array(colorsArray);
+  square.setInstanceVBOs(sOffsets, sColors);
   square.setNumInstances(n * n); // grid of "particles"
 }
 
@@ -161,24 +189,24 @@ function main() {
       rotation = controls.rotation;
       size = controls.size;
       
-      lsystem = new Lsystem("TF", iterations, size, size, rotation);
-      lsystem.traverse();
+      /*plantSystem = new PlantSystem("TF", iterations, size, size, rotation);
+      plantSystem.traverse();
 
-      let transform1: Float32Array = new Float32Array(lsystem.transform1Array);
-      let transform2: Float32Array = new Float32Array(lsystem.transform2Array);
-      let transform3: Float32Array = new Float32Array(lsystem.transform3Array);
-      let transform4: Float32Array = new Float32Array(lsystem.transform4Array);
-      let color: Float32Array = new Float32Array(lsystem.colorsArray);
+      let transform1: Float32Array = new Float32Array(plantSystem.transform1Array);
+      let transform2: Float32Array = new Float32Array(plantSystem.transform2Array);
+      let transform3: Float32Array = new Float32Array(plantSystem.transform3Array);
+      let transform4: Float32Array = new Float32Array(plantSystem.transform4Array);
+      let color: Float32Array = new Float32Array(plantSystem.colorsArray);
       cylinder.setInstanceVBOs(transform1, transform2, transform3, transform4, color);
-      cylinder.setNumInstances(lsystem.cylinders);
+      cylinder.setNumInstances(plantSystem.cylinders);
 
-      let transform1p: Float32Array = new Float32Array(lsystem.transform1pArray);
-      let transform2p: Float32Array = new Float32Array(lsystem.transform2pArray);
-      let transform3p: Float32Array = new Float32Array(lsystem.transform3pArray);
-      let transform4p: Float32Array = new Float32Array(lsystem.transform4pArray);
-      let colorp: Float32Array = new Float32Array(lsystem.colorspArray);
+      let transform1p: Float32Array = new Float32Array(plantSystem.transform1pArray);
+      let transform2p: Float32Array = new Float32Array(plantSystem.transform2pArray);
+      let transform3p: Float32Array = new Float32Array(plantSystem.transform3pArray);
+      let transform4p: Float32Array = new Float32Array(plantSystem.transform4pArray);
+      let colorp: Float32Array = new Float32Array(plantSystem.colorspArray);
       person.setInstanceVBOs(transform1p, transform2p, transform3p, transform4p, colorp);
-      person.setNumInstances(lsystem.persons);
+      person.setNumInstances(plantSystem.persons);*/
     }
     renderer.clear();
     renderer.render(camera, flat, [screenQuad]);
