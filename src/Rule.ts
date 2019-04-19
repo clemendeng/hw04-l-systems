@@ -117,7 +117,7 @@ export default class system {
 
                 let nextFloor = new Rule("p" + floorHeight + "u");
                 nextFloor.params.push(floorHeight);
-                nextFloor.func = this.forward;
+                nextFloor.func = ;
 
                 target.push(nextFloor);
                 currHeight += floorHeight;

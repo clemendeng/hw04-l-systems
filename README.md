@@ -29,3 +29,7 @@ The user could also add in additional elements. They would modify the attributes
 I then spend many hours trying to come up with a working framework that could display these rules, allow the user to select them, and modify them. I know I am going to have a Rule class, which includes an expansion function that expands the rule into a Rule[], a function is to be called when the lsystem is being processed, and a Rule[] to track its child rules. After finally reaching this conclusion, I tried to implement a simple building and realized having a class with functions as parameters is not that straightforward. I am currently trying to find a workaround for this.
 
 The overall grammar system will have the axiom, the current Rule[], and an expansion history of type Rule[][] that tracks previous expansions. The index of this will be the iteration number, so for example history[0] will just contain the axiom. When the user selects an element in the GUI, the program will retrieve the depth of the element (since they will be displayed hierarchically), and retrieve the Rule associated with that element. Then if the user modifies its parameters the program will modify them and update the lsystem.
+
+## Code
+
+If you guys do end up seeing this soon, LSystem.ts contains the generalized lsystem that supports parameters, and it also has an attempt a creating a Box class. Rule.ts contains the user friendly lsystem design part. Any suggestions are greatly appreciated.
