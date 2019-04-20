@@ -3,6 +3,12 @@ export var gl: WebGL2RenderingContext;
 export function setGL(_gl: WebGL2RenderingContext) {
   gl = _gl;
 }
+
+// Converts from degrees to radians.
+export function radians(degrees : number) {
+    return degrees * Math.PI / 180;
+};
+
 export function readTextFile(file: string): string
 {
     var text = "";

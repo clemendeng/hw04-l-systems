@@ -38,10 +38,6 @@ class Turtle {
     return this;
   }
 
-  moveForward(t: number) {
-    vec3.add(this.position, this.position, vec3.scale(vec3.create(), this.orientation, t));
-  }
-
   rotateUp() {
     let q: quat = quat.create();
     quat.setAxisAngle(q, this.right, radians(15));

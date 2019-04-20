@@ -2,28 +2,32 @@ import * as Stats from 'stats-js';
 import * as DAT from 'dat-gui';
 import Camera from './Camera';
 import {setGL, readTextFile} from './globals';
-import {vec3, mat4} from 'gl-matrix';
+import {vec3} from 'gl-matrix';
 import Square from './geometry/Square';
 import ScreenQuad from './geometry/ScreenQuad';
 import Mesh from './geometry/Mesh';
 import OpenGLRenderer from './rendering/gl/OpenGLRenderer';
 import ShaderProgram, {Shader} from './rendering/gl/ShaderProgram';
 import PlantSystem from './PlantSystem';
-import LSystem from './Lsystem';
+import {Rule, ExpRule, FnRule, System} from './System';
 
 // Define an object with application parameters and button callbacks
 // This will be referred to by dat.GUI's functions that add GUI elements.
 const controls = {
-  iterations: 30,
-  size: 20,
-  rotation: 5
+  // iterations: 30,
+  // size: 20,
+  // rotation: 5
+
 };
+let gui: DAT.GUI;
 
 let square: Square;
 let screenQuad: ScreenQuad;
 let time: number = 0.0;
 
-let lsystem: LSystem;
+//Iteration depth / Expansion index
+let system: System;
+
 let cube: Mesh;
 let meshes: Mesh[] = [];
 
@@ -47,14 +51,16 @@ function loadScene() {
   cube.create();
   meshes.push(cube);
 
-  lsystem = new LSystem("T", 0);
-  lsystem.traverse();
+  system = new System();
+  system.setup();
+  system.expand(4);
+  system.process();
 
-  let transforms1 = lsystem.getTransform1Arrays();
-  let transforms2 = lsystem.getTransform2Arrays();
-  let transforms3 = lsystem.getTransform3Arrays();
-  let transforms4 = lsystem.getTransform4Arrays();
-  let colors = lsystem.getColorsArrays();
+  let transforms1 = system.getTransform1Arrays();
+  let transforms2 = system.getTransform2Arrays();
+  let transforms3 = system.getTransform3Arrays();
+  let transforms4 = system.getTransform4Arrays();
+  let colors = system.getColorsArrays();
   for(let i = 0; i < meshes.length; i++) {
     let t1 = new Float32Array(transforms1[i]);
     let t2 = new Float32Array(transforms2[i]);
@@ -62,16 +68,16 @@ function loadScene() {
     let t4 = new Float32Array(transforms4[i]);
     let c = new Float32Array(colors[i]);
     meshes[i].setInstanceVBOs(t1, t2, t3, t4, c);
-    meshes[i].setNumInstances(lsystem.getNums()[i]);
+    meshes[i].setNumInstances(system.getNums()[i]);
   }
 
-  let obj1: string = readTextFile('./cylinder.obj');
+  /*let obj1: string = readTextFile('./cylinder.obj');
   cylinder = new Mesh(obj1, vec3.fromValues(0, 0, 0));
   cylinder.create();
   let obj2: string = readTextFile('./person.obj');
   person = new Mesh(obj2, vec3.fromValues(0, 0, 0));
   person.create();
-  /*plantSystem = new PlantSystem("TF", 30, 20, 20, 5);
+  plantSystem = new PlantSystem("TF", 30, 20, 20, 5);
   plantSystem.traverse();
 
   let transform1: Float32Array = new Float32Array(plantSystem.transform1Array);
@@ -105,31 +111,108 @@ function loadScene() {
   let c: Float32Array = new Float32Array(cc);
   plane.setInstanceVBOs(t1, t2, t3, t4, c);
   plane.setNumInstances(1);
+}
 
-  // Set up instanced rendering data arrays here.
-  // This example creates a set of positional
-  // offsets and gradiated colors for a 100x100 grid
-  // of squares, even though the VBO data for just
-  // one square is actually passed to the GPU
-  let offsetsArray = [];
-  let colorsArray = [];
-  let n: number = 100.0;
-  for(let i = 0; i < n; i++) {
-    for(let j = 0; j < n; j++) {
-      offsetsArray.push(i);
-      offsetsArray.push(j);
-      offsetsArray.push(0);
+function ctrlChanged(rule: Rule, paramNum: number) {
+  let target = function(): void {
+    let controller: DAT.GUIController = <DAT.GUIController> this;
+    let newValue = controller.getValue();
+    //curr is the iteration we want to go back to
+    let curr: Rule[] = system.expHistory[rule.depth];
+    //remove all following iterations from our history
+    system.expHistory.length = rule.depth + 1;
+    system.current = curr;
 
-      colorsArray.push(i / n);
-      colorsArray.push(j / n);
-      colorsArray.push(1.0);
-      colorsArray.push(1.0); // Alpha channel
+    rule.changeParam(paramNum - 1, newValue);
+
+    system.clear();
+    system.expand(4);
+    system.process();
+
+    let transforms1 = system.getTransform1Arrays();
+    let transforms2 = system.getTransform2Arrays();
+    let transforms3 = system.getTransform3Arrays();
+    let transforms4 = system.getTransform4Arrays();
+    let colors = system.getColorsArrays();
+    for(let i = 0; i < meshes.length; i++) {
+      let t1 = new Float32Array(transforms1[i]);
+      let t2 = new Float32Array(transforms2[i]);
+      let t3 = new Float32Array(transforms3[i]);
+      let t4 = new Float32Array(transforms4[i]);
+      let c = new Float32Array(colors[i]);
+      meshes[i].setInstanceVBOs(t1, t2, t3, t4, c);
+      meshes[i].setNumInstances(system.getNums()[i]);
+    }
+
+    gui.destroy();
+    gui = new DAT.GUI();
+    setGUI(system.axiom, gui);
+  };
+  return target;
+}
+
+function setGUI(rule: Rule, gui: DAT.GUI) {
+  if(rule.params.length == 0) {
+    let text = {name: rule.s}
+    gui.add(text, 'name');
+  } else {
+    //Expansion rule
+    let guiFolder = gui.addFolder(rule.s);
+
+    if(rule.params.length == 1) {
+      let text = {prop1: rule.params[0]}
+      let ctrl1 = guiFolder.add(text, 'prop1');
+      ctrl1.name(rule.paramNames[0]);
+      ctrl1.onFinishChange(ctrlChanged(rule, 1));
+    } else if(rule.params.length == 2) {
+      let text = {prop1: rule.params[0],
+                  prop2: rule.params[1]}
+      let ctrl1 = guiFolder.add(text, 'prop1');
+      let ctrl2 = guiFolder.add(text, 'prop2');
+      ctrl1.name(rule.paramNames[0]);
+      ctrl2.name(rule.paramNames[1]);
+      ctrl1.onFinishChange(ctrlChanged(rule, 1));
+      ctrl2.onFinishChange(ctrlChanged(rule, 2));
+    } else if(rule.params.length == 3) {
+      let text = {prop1: rule.params[0],
+                  prop2: rule.params[1],
+                  prop3: rule.params[2]}
+      let ctrl1 = guiFolder.add(text, 'prop1');
+      let ctrl2 = guiFolder.add(text, 'prop2');
+      let ctrl3 = guiFolder.add(text, 'prop3');
+      ctrl1.name(rule.paramNames[0]);
+      ctrl2.name(rule.paramNames[1]);
+      ctrl3.name(rule.paramNames[2]);
+      ctrl1.onFinishChange(ctrlChanged(rule, 1));
+      ctrl2.onFinishChange(ctrlChanged(rule, 2));
+      ctrl3.onFinishChange(ctrlChanged(rule, 3));
+    } else if(rule.params.length == 4) {
+      let text = {prop1: rule.params[0],
+                  prop2: rule.params[1],
+                  prop3: rule.params[2],
+                  prop4: rule.params[3]}
+      let ctrl1 = guiFolder.add(text, 'prop1');
+      let ctrl2 = guiFolder.add(text, 'prop2');
+      let ctrl3 = guiFolder.add(text, 'prop3');
+      let ctrl4 = guiFolder.add(text, 'prop4');
+      ctrl1.name(rule.paramNames[0]);
+      ctrl2.name(rule.paramNames[1]);
+      ctrl3.name(rule.paramNames[2]);
+      ctrl4.name(rule.paramNames[3]);
+      ctrl1.onFinishChange(ctrlChanged(rule, 1));
+      ctrl2.onFinishChange(ctrlChanged(rule, 2));
+      ctrl3.onFinishChange(ctrlChanged(rule, 3));
+      ctrl4.onFinishChange(ctrlChanged(rule, 4));
+    }
+
+    if(rule instanceof ExpRule) {
+      let guiExpFolder = guiFolder.addFolder(rule.s + " expansion");
+      let children = rule.children;
+      for(let i = 0; i < children.length; i++) {
+        setGUI(children[i], guiExpFolder);
+      }
     }
   }
-  let sOffsets: Float32Array = new Float32Array(offsetsArray);
-  let sColors: Float32Array = new Float32Array(colorsArray);
-  square.setInstanceVBOs(sOffsets, sColors);
-  square.setNumInstances(n * n); // grid of "particles"
 }
 
 function main() {
@@ -142,10 +225,10 @@ function main() {
   document.body.appendChild(stats.domElement);
 
   // Add controls to the gui
-  const gui = new DAT.GUI();
-  gui.add(controls, 'iterations', 0, 35);
-  gui.add(controls, 'size', 10, 30);
-  gui.add(controls, 'rotation', 0, 10);
+  gui = new DAT.GUI();
+  // gui.add(controls, 'iterations', 0, 35);
+  // gui.add(controls, 'size', 10, 30);
+  // gui.add(controls, 'rotation', 0, 10);
 
   // get canvas and webgl context
   const canvas = <HTMLCanvasElement> document.getElementById('canvas');
@@ -159,6 +242,8 @@ function main() {
 
   // Initial call to load scene
   loadScene();
+
+  setGUI(system.axiom, gui);
 
   const camera = new Camera(vec3.fromValues(0, 35, 60), vec3.fromValues(0, 15, 0));
 
@@ -183,13 +268,13 @@ function main() {
     instancedShader.setTime(time);
     flat.setTime(time++);
     gl.viewport(0, 0, window.innerWidth, window.innerHeight);
-    if(controls.iterations != iterations || 
+    /*if(controls.iterations != iterations || 
       controls.rotation != rotation || controls.size != size) {
       iterations = controls.iterations;
       rotation = controls.rotation;
       size = controls.size;
       
-      /*plantSystem = new PlantSystem("TF", iterations, size, size, rotation);
+      plantSystem = new PlantSystem("TF", iterations, size, size, rotation);
       plantSystem.traverse();
 
       let transform1: Float32Array = new Float32Array(plantSystem.transform1Array);
@@ -206,12 +291,12 @@ function main() {
       let transform4p: Float32Array = new Float32Array(plantSystem.transform4pArray);
       let colorp: Float32Array = new Float32Array(plantSystem.colorspArray);
       person.setInstanceVBOs(transform1p, transform2p, transform3p, transform4p, colorp);
-      person.setNumInstances(plantSystem.persons);*/
-    }
+      person.setNumInstances(plantSystem.persons);
+      }*/
     renderer.clear();
     renderer.render(camera, flat, [screenQuad]);
     renderer.render(camera, instancedShader, [
-      square, cylinder, person, plane
+      cube, square, plane
     ]);
     stats.end();
 
