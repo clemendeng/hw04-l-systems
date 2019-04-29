@@ -108,6 +108,7 @@ class PlantTurtle {
     this.scale[0] = this.scale[0] * 0.5;
     this.scale[2] = this.scale[2] * 0.5;
 
+    //Angle: 30-60
     let t : number = Math.random() * 30;
     let q : quat = quat.create();
     quat.setAxisAngle(q, this.right, radians(-30 - t));
@@ -132,6 +133,7 @@ class PlantTurtle {
     this.scale[0] = this.scale[0] * 0.75;
     this.scale[2] = this.scale[2] * 0.75;
 
+    //Angle: 15-30
     let t : number = Math.random() * 15;
     let q : quat = quat.create();
     quat.setAxisAngle(q, this.right, radians(-15 - t));

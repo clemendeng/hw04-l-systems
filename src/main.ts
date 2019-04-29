@@ -17,7 +17,9 @@ const controls = {
   // iterations: 30,
   // size: 20,
   // rotation: 5
-
+  load: 0,
+  iterations: 15,
+  delete: function(){}
 };
 let gui: DAT.GUI;
 
@@ -27,6 +29,9 @@ let time: number = 0.0;
 
 //Iteration depth / Expansion index
 let system: System;
+let selected: Rule;
+let selectedGUI: DAT.GUI;
+let selectControllers: DAT.GUIController[];
 
 let cube: Mesh;
 let meshes: Mesh[] = [];
@@ -36,7 +41,7 @@ let cylinder: Mesh;
 let person: Mesh;
 let plane: Mesh;
 
-let iterations: number = 30;
+let iterations: number = 15;
 let size: number = 20;
 let rotation: number = 5;
 
@@ -51,9 +56,20 @@ function loadScene() {
   cube.create();
   meshes.push(cube);
 
+  let obj1: string = readTextFile('./cylinder.obj');
+  cylinder = new Mesh(obj1, vec3.fromValues(0, 0, 0));
+  cylinder.create();
+  meshes.push(cylinder);
+
+  let obj2: string = readTextFile('./person.obj');
+  person = new Mesh(obj2, vec3.fromValues(0, 0, 0));
+  person.create();
+  meshes.push(person);
+
   system = new System();
-  system.setup();
-  system.expand(4);
+  system.setup(2);
+  system.clear();
+  system.expand(controls.iterations);
   system.process();
 
   let transforms1 = system.getTransform1Arrays();
@@ -70,14 +86,8 @@ function loadScene() {
     meshes[i].setInstanceVBOs(t1, t2, t3, t4, c);
     meshes[i].setNumInstances(system.getNums()[i]);
   }
-
-  /*let obj1: string = readTextFile('./cylinder.obj');
-  cylinder = new Mesh(obj1, vec3.fromValues(0, 0, 0));
-  cylinder.create();
-  let obj2: string = readTextFile('./person.obj');
-  person = new Mesh(obj2, vec3.fromValues(0, 0, 0));
-  person.create();
-  plantSystem = new PlantSystem("TF", 30, 20, 20, 5);
+  
+  /*plantSystem = new PlantSystem("TF", 30, 20, 20, 5);
   plantSystem.traverse();
 
   let transform1: Float32Array = new Float32Array(plantSystem.transform1Array);
@@ -117,16 +127,166 @@ function ctrlChanged(rule: Rule, paramNum: number) {
   let target = function(): void {
     let controller: DAT.GUIController = <DAT.GUIController> this;
     let newValue = controller.getValue();
+    if(paramNum == 0) {
+      //Name change
+      rule.s = newValue;
+    } else {
+      //Parameter change
+      rule.changeParam(paramNum - 1, newValue);
+      system.updateChangedParam(rule);
+      system.clear();
+      system.process();
+
+      let transforms1 = system.getTransform1Arrays();
+      let transforms2 = system.getTransform2Arrays();
+      let transforms3 = system.getTransform3Arrays();
+      let transforms4 = system.getTransform4Arrays();
+      let colors = system.getColorsArrays();
+      for(let i = 0; i < meshes.length; i++) {
+        let t1 = new Float32Array(transforms1[i]);
+        let t2 = new Float32Array(transforms2[i]);
+        let t3 = new Float32Array(transforms3[i]);
+        let t4 = new Float32Array(transforms4[i]);
+        let c = new Float32Array(colors[i]);
+        meshes[i].setInstanceVBOs(t1, t2, t3, t4, c);
+        meshes[i].setNumInstances(system.getNums()[i]);
+      }
+    }
+
+    gui.destroy();
+    gui = new DAT.GUI();
+    initSelected(gui);
+    setGUIArray(system.axiom, gui);
+    let func = selectFn(selected, selectedGUI);
+    func();
+  };
+  return target;
+}
+
+function initSelected(gui: DAT.GUI) {
+  let loadFunc = gui.add(controls, "load", {Building: 1, Plant: 2});
+  loadFunc.onFinishChange(loadFn);
+  let iterationsFunc = gui.add(controls, "iterations");
+  iterationsFunc.onFinishChange(iterationsFn);
+
+  selectControllers = [];
+  let guiFolder = gui.addFolder("Selected");
+  let text = {name: "", prop1: 0.01, prop2: 0.01, prop3: 0.01, prop4: 0.01}
+  selectControllers.push(guiFolder.add(text, 'name'));
+  selectControllers.push(guiFolder.add(text, 'prop1'));
+  selectControllers.push(guiFolder.add(text, 'prop2'));
+  selectControllers.push(guiFolder.add(text, 'prop3'));
+  selectControllers.push(guiFolder.add(text, 'prop4'));
+  for(let i = 1; i < selectControllers.length; i++) {
+    selectControllers[i].step(0.01);
+  }
+  guiFolder.add(controls, 'delete');
+  guiFolder.open();
+}
+
+function selectFn(rule: Rule, folder: DAT.GUI) {
+  let target = function(): void {
+    selected = rule;
+    selectedGUI = folder;
+    //Setting name controller
+    selectControllers[0].setValue(rule.s);
+    selectControllers[0].onFinishChange(ctrlChanged(rule, 0));
+    //Setting parameter controllers
+    for(let i = 1; i <= 4; i++) {
+      if(rule.params.length >= i) {
+        selectControllers[i].name(rule.paramNames[i - 1]);
+        selectControllers[i].step(0.01);
+        selectControllers[i].setValue(rule.params[i - 1]);
+        selectControllers[i].onFinishChange(ctrlChanged(rule, i));
+      } else {
+        selectControllers[i].name('-');
+        selectControllers[i].setValue(0);
+      }
+    }
+    controls.delete = deleteFn(rule);
+  };
+  return target;
+}
+
+function loadFn() {
+  let controller: DAT.GUIController = <DAT.GUIController> this;
+  let newValue = controller.getValue();
+  if(newValue == 1) {
+    controls.iterations = 2;
+  } else if(newValue == 2) {
+    controls.iterations = 15;
+  }
+  system.setup(newValue);
+  system.clear();
+  system.expand(controls.iterations);
+  system.process();
+
+  let transforms1 = system.getTransform1Arrays();
+  let transforms2 = system.getTransform2Arrays();
+  let transforms3 = system.getTransform3Arrays();
+  let transforms4 = system.getTransform4Arrays();
+  let colors = system.getColorsArrays();
+  for(let i = 0; i < meshes.length; i++) {
+    let t1 = new Float32Array(transforms1[i]);
+    let t2 = new Float32Array(transforms2[i]);
+    let t3 = new Float32Array(transforms3[i]);
+    let t4 = new Float32Array(transforms4[i]);
+    let c = new Float32Array(colors[i]);
+    meshes[i].setInstanceVBOs(t1, t2, t3, t4, c);
+    meshes[i].setNumInstances(system.getNums()[i]);
+  }
+
+  controls.load = 0;
+  gui.destroy();
+  gui = new DAT.GUI();
+  initSelected(gui);
+  setGUIArray(system.axiom, gui);
+}
+
+function iterationsFn() {
+  system.clear();
+  if(controls.iterations < system.currDepth) {
+    system.current = system.expHistory[controls.iterations];
+    system.currDepth = controls.iterations;
+  } else if(controls.iterations > system.currDepth) {
+    system.expand(controls.iterations - system.currDepth);
+  }
+  system.process();
+
+  let transforms1 = system.getTransform1Arrays();
+  let transforms2 = system.getTransform2Arrays();
+  let transforms3 = system.getTransform3Arrays();
+  let transforms4 = system.getTransform4Arrays();
+  let colors = system.getColorsArrays();
+  for(let i = 0; i < meshes.length; i++) {
+    let t1 = new Float32Array(transforms1[i]);
+    let t2 = new Float32Array(transforms2[i]);
+    let t3 = new Float32Array(transforms3[i]);
+    let t4 = new Float32Array(transforms4[i]);
+    let c = new Float32Array(colors[i]);
+    meshes[i].setInstanceVBOs(t1, t2, t3, t4, c);
+    meshes[i].setNumInstances(system.getNums()[i]);
+  }
+
+  gui.destroy();
+  gui = new DAT.GUI();
+  initSelected(gui);
+  setGUIArray(system.axiom, gui);
+}
+
+function deleteFn(rule: Rule) {
+  let target = function(): void {
+    //Parameter change
     //curr is the iteration we want to go back to
     let curr: Rule[] = system.expHistory[rule.depth];
+    let expand = system.expHistory.length - rule.depth;
     //remove all following iterations from our history
     system.expHistory.length = rule.depth + 1;
     system.current = curr;
-
-    rule.changeParam(paramNum - 1, newValue);
+    system.current.splice(rule.index, 1);
 
     system.clear();
-    system.expand(4);
+    system.expand(expand);
     system.process();
 
     let transforms1 = system.getTransform1Arrays();
@@ -146,72 +306,36 @@ function ctrlChanged(rule: Rule, paramNum: number) {
 
     gui.destroy();
     gui = new DAT.GUI();
-    setGUI(system.axiom, gui);
+    initSelected(gui);
+    if(system.expHistory[0].length != 0) {
+      setGUIArray(system.axiom, gui);
+    }
   };
   return target;
 }
 
+function setGUIArray(rules: Rule[], gui: DAT.GUI) {
+  for(let i = 0; i < rules.length; i++) {
+    setGUI(rules[i], gui);
+  }
+}
+
 function setGUI(rule: Rule, gui: DAT.GUI) {
-  if(rule.params.length == 0) {
-    let text = {name: rule.s}
-    gui.add(text, 'name');
-  } else {
-    //Expansion rule
+  if((rule.exp && rule.children.length > 0) || rule.params.length > 0) {
+    //For functions with parameters
     let guiFolder = gui.addFolder(rule.s);
-
-    if(rule.params.length == 1) {
-      let text = {prop1: rule.params[0]}
-      let ctrl1 = guiFolder.add(text, 'prop1');
-      ctrl1.name(rule.paramNames[0]);
-      ctrl1.onFinishChange(ctrlChanged(rule, 1));
-    } else if(rule.params.length == 2) {
-      let text = {prop1: rule.params[0],
-                  prop2: rule.params[1]}
-      let ctrl1 = guiFolder.add(text, 'prop1');
-      let ctrl2 = guiFolder.add(text, 'prop2');
-      ctrl1.name(rule.paramNames[0]);
-      ctrl2.name(rule.paramNames[1]);
-      ctrl1.onFinishChange(ctrlChanged(rule, 1));
-      ctrl2.onFinishChange(ctrlChanged(rule, 2));
-    } else if(rule.params.length == 3) {
-      let text = {prop1: rule.params[0],
-                  prop2: rule.params[1],
-                  prop3: rule.params[2]}
-      let ctrl1 = guiFolder.add(text, 'prop1');
-      let ctrl2 = guiFolder.add(text, 'prop2');
-      let ctrl3 = guiFolder.add(text, 'prop3');
-      ctrl1.name(rule.paramNames[0]);
-      ctrl2.name(rule.paramNames[1]);
-      ctrl3.name(rule.paramNames[2]);
-      ctrl1.onFinishChange(ctrlChanged(rule, 1));
-      ctrl2.onFinishChange(ctrlChanged(rule, 2));
-      ctrl3.onFinishChange(ctrlChanged(rule, 3));
-    } else if(rule.params.length == 4) {
-      let text = {prop1: rule.params[0],
-                  prop2: rule.params[1],
-                  prop3: rule.params[2],
-                  prop4: rule.params[3]}
-      let ctrl1 = guiFolder.add(text, 'prop1');
-      let ctrl2 = guiFolder.add(text, 'prop2');
-      let ctrl3 = guiFolder.add(text, 'prop3');
-      let ctrl4 = guiFolder.add(text, 'prop4');
-      ctrl1.name(rule.paramNames[0]);
-      ctrl2.name(rule.paramNames[1]);
-      ctrl3.name(rule.paramNames[2]);
-      ctrl4.name(rule.paramNames[3]);
-      ctrl1.onFinishChange(ctrlChanged(rule, 1));
-      ctrl2.onFinishChange(ctrlChanged(rule, 2));
-      ctrl3.onFinishChange(ctrlChanged(rule, 3));
-      ctrl4.onFinishChange(ctrlChanged(rule, 4));
-    }
-
-    if(rule instanceof ExpRule) {
+    let button = {select: selectFn(rule, guiFolder)};
+    guiFolder.add(button, 'select');
+    if(rule.exp && rule.children.length > 0) {
       let guiExpFolder = guiFolder.addFolder(rule.s + " expansion");
       let children = rule.children;
       for(let i = 0; i < children.length; i++) {
         setGUI(children[i], guiExpFolder);
       }
     }
+  } else {
+    let text = {name: rule.s}
+    gui.add(text, 'name');
   }
 }
 
@@ -242,8 +366,8 @@ function main() {
 
   // Initial call to load scene
   loadScene();
-
-  setGUI(system.axiom, gui);
+  initSelected(gui);
+  setGUIArray(system.axiom, gui);
 
   const camera = new Camera(vec3.fromValues(0, 35, 60), vec3.fromValues(0, 15, 0));
 
@@ -296,7 +420,7 @@ function main() {
     renderer.clear();
     renderer.render(camera, flat, [screenQuad]);
     renderer.render(camera, instancedShader, [
-      cube, square, plane
+      cube, cylinder, person, square, plane
     ]);
     stats.end();
 

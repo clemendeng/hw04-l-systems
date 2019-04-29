@@ -13,6 +13,7 @@ class Turtle {
   color: vec4 = vec4.fromValues(0.5, 1, 0.5, 1);
   scale: vec3 = vec3.fromValues(1, 1, 1);
   depth: number = 0;
+  branchAngle: number = 0;
 
   constructor(pos: vec3, orient: vec3, right: vec3, up: vec3) {
     this.position = pos;
@@ -35,6 +36,7 @@ class Turtle {
     this.color = vec4.clone(t.color);
     this.scale = vec3.clone(t.scale);
     this.depth = t.depth;
+    this.branchAngle = t.branchAngle;
     return this;
   }
 

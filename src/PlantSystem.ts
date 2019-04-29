@@ -61,11 +61,11 @@ class PlantSystem {
         this.expansionRules.set('F', 'gfgfgfgfx[P][,P][,,P][,,,P][,,,,P][,,,,,P][,,,,,,P][,,,,,,,P][,,,,,,,,P][,,,,,,,,,P]' + 
             '[,,,,,,,,,,P][,,,,,,,,,,,P][,,,,,,,,,,,,P][.P][..P][...P][....P][.....P][......P][.......P][........P]' +
             '[.........P][..........P][...........P]');
-        this.expansionRules.set('P', '+[S]++[S]++C');
+        this.expansionRules.set('P', '[S]++[S]+++C');
         //Petal
         this.expansionRules.set('C', 'gfcC');
         //Spike
-        this.expansionRules.set('S', 'q-lllg');
+        this.expansionRules.set('S', 'qlllg');
 
         //Trunk
         this.expansionRules.set('T', 'WgfgfgfgfG');
