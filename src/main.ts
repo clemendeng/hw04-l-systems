@@ -8,17 +8,13 @@ import ScreenQuad from './geometry/ScreenQuad';
 import Mesh from './geometry/Mesh';
 import OpenGLRenderer from './rendering/gl/OpenGLRenderer';
 import ShaderProgram, {Shader} from './rendering/gl/ShaderProgram';
-import PlantSystem from './PlantSystem';
-import {Rule, ExpRule, FnRule, System} from './System';
+import {Rule, Null, System} from './System';
 
 // Define an object with application parameters and button callbacks
 // This will be referred to by dat.GUI's functions that add GUI elements.
 const controls = {
-  // iterations: 30,
-  // size: 20,
-  // rotation: 5
   load: 0,
-  iterations: 15,
+  iterations: 2,
   delete: function(){}
 };
 let gui: DAT.GUI;
@@ -33,17 +29,11 @@ let selected: Rule;
 let selectedGUI: DAT.GUI;
 let selectControllers: DAT.GUIController[];
 
-let cube: Mesh;
 let meshes: Mesh[] = [];
-
-let plantSystem: PlantSystem;
+let cube: Mesh;
 let cylinder: Mesh;
 let person: Mesh;
 let plane: Mesh;
-
-let iterations: number = 15;
-let size: number = 20;
-let rotation: number = 5;
 
 function loadScene() {
   square = new Square();
@@ -67,7 +57,7 @@ function loadScene() {
   meshes.push(person);
 
   system = new System();
-  system.setup(2);
+  system.setup(1);
   system.clear();
   system.expand(controls.iterations);
   system.process();
@@ -86,25 +76,6 @@ function loadScene() {
     meshes[i].setInstanceVBOs(t1, t2, t3, t4, c);
     meshes[i].setNumInstances(system.getNums()[i]);
   }
-  
-  /*plantSystem = new PlantSystem("TF", 30, 20, 20, 5);
-  plantSystem.traverse();
-
-  let transform1: Float32Array = new Float32Array(plantSystem.transform1Array);
-  let transform2: Float32Array = new Float32Array(plantSystem.transform2Array);
-  let transform3: Float32Array = new Float32Array(plantSystem.transform3Array);
-  let transform4: Float32Array = new Float32Array(plantSystem.transform4Array);
-  let color: Float32Array = new Float32Array(plantSystem.colorsArray);
-  cylinder.setInstanceVBOs(transform1, transform2, transform3, transform4, color);
-  cylinder.setNumInstances(plantSystem.cylinders);
-
-  let transform1p: Float32Array = new Float32Array(plantSystem.transform1pArray);
-  let transform2p: Float32Array = new Float32Array(plantSystem.transform2pArray);
-  let transform3p: Float32Array = new Float32Array(plantSystem.transform3pArray);
-  let transform4p: Float32Array = new Float32Array(plantSystem.transform4pArray);
-  let colorp: Float32Array = new Float32Array(plantSystem.colorspArray);
-  person.setInstanceVBOs(transform1p, transform2p, transform3p, transform4p, colorp);
-  person.setNumInstances(plantSystem.persons);*/
 
   let obj3: string = readTextFile('./plane.obj');
   plane = new Mesh(obj3, vec3.fromValues(0, 0, 0));
@@ -279,11 +250,14 @@ function deleteFn(rule: Rule) {
     //Parameter change
     //curr is the iteration we want to go back to
     let curr: Rule[] = system.expHistory[rule.depth];
-    let expand = system.expHistory.length - rule.depth;
+    let expand = system.expHistory.length - rule.depth - 1;
     //remove all following iterations from our history
     system.expHistory.length = rule.depth + 1;
     system.current = curr;
-    system.current.splice(rule.index, 1);
+    system.currDepth = rule.depth;
+    system.current[rule.indexes[rule.depth]].deleted = true;
+    system.current.splice(rule.indexes[rule.depth], 1);
+    system.current.splice(rule.indexes[rule.depth], 0, new Null(rule.depth, rule.indexes[rule.depth]));
 
     system.clear();
     system.expand(expand);
@@ -321,6 +295,9 @@ function setGUIArray(rules: Rule[], gui: DAT.GUI) {
 }
 
 function setGUI(rule: Rule, gui: DAT.GUI) {
+  if(rule instanceof Null || rule.deleted) {
+    return;
+  }
   if((rule.exp && rule.children.length > 0) || rule.params.length > 0) {
     //For functions with parameters
     let guiFolder = gui.addFolder(rule.s);
@@ -348,11 +325,7 @@ function main() {
   stats.domElement.style.top = '0px';
   document.body.appendChild(stats.domElement);
 
-  // Add controls to the gui
   gui = new DAT.GUI();
-  // gui.add(controls, 'iterations', 0, 35);
-  // gui.add(controls, 'size', 10, 30);
-  // gui.add(controls, 'rotation', 0, 10);
 
   // get canvas and webgl context
   const canvas = <HTMLCanvasElement> document.getElementById('canvas');
@@ -392,31 +365,6 @@ function main() {
     instancedShader.setTime(time);
     flat.setTime(time++);
     gl.viewport(0, 0, window.innerWidth, window.innerHeight);
-    /*if(controls.iterations != iterations || 
-      controls.rotation != rotation || controls.size != size) {
-      iterations = controls.iterations;
-      rotation = controls.rotation;
-      size = controls.size;
-      
-      plantSystem = new PlantSystem("TF", iterations, size, size, rotation);
-      plantSystem.traverse();
-
-      let transform1: Float32Array = new Float32Array(plantSystem.transform1Array);
-      let transform2: Float32Array = new Float32Array(plantSystem.transform2Array);
-      let transform3: Float32Array = new Float32Array(plantSystem.transform3Array);
-      let transform4: Float32Array = new Float32Array(plantSystem.transform4Array);
-      let color: Float32Array = new Float32Array(plantSystem.colorsArray);
-      cylinder.setInstanceVBOs(transform1, transform2, transform3, transform4, color);
-      cylinder.setNumInstances(plantSystem.cylinders);
-
-      let transform1p: Float32Array = new Float32Array(plantSystem.transform1pArray);
-      let transform2p: Float32Array = new Float32Array(plantSystem.transform2pArray);
-      let transform3p: Float32Array = new Float32Array(plantSystem.transform3pArray);
-      let transform4p: Float32Array = new Float32Array(plantSystem.transform4pArray);
-      let colorp: Float32Array = new Float32Array(plantSystem.colorspArray);
-      person.setInstanceVBOs(transform1p, transform2p, transform3p, transform4p, colorp);
-      person.setNumInstances(plantSystem.persons);
-      }*/
     renderer.clear();
     renderer.render(camera, flat, [screenQuad]);
     renderer.render(camera, instancedShader, [

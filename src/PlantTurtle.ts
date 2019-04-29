@@ -5,6 +5,7 @@ function radians(degrees : number) {
   return degrees * Math.PI / 180;
 };
 
+//NOT FOR THIS PROJECT
 class PlantTurtle {
   position: vec3 = vec3.create();
   orientation: vec3 = vec3.create();

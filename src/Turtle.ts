@@ -1,10 +1,5 @@
 import { vec3, vec4, quat, mat4 } from 'gl-matrix';
 
-// Converts from degrees to radians.
-function radians(degrees : number) {
-  return degrees * Math.PI / 180;
-};
-
 class Turtle {
   position: vec3 = vec3.create();
   orientation: vec3 = vec3.create();
@@ -38,66 +33,6 @@ class Turtle {
     this.depth = t.depth;
     this.branchAngle = t.branchAngle;
     return this;
-  }
-
-  rotateUp() {
-    let q: quat = quat.create();
-    quat.setAxisAngle(q, this.right, radians(15));
-    quat.normalize(q, q);
-    vec3.transformQuat(this.orientation, this.orientation, q);
-    vec3.normalize(this.orientation, this.orientation);
-    vec3.transformQuat(this.up, this.up, q);
-    vec3.normalize(this.up, this.up);
-  }
-
-  rotateDown() {
-    let q: quat = quat.create();
-    quat.setAxisAngle(q, this.right, radians(-15));
-    quat.normalize(q, q);
-    vec3.transformQuat(this.orientation, this.orientation, q);
-    vec3.normalize(this.orientation, this.orientation);
-    vec3.transformQuat(this.up, this.up, q);
-    vec3.normalize(this.up, this.up);
-  }
-
-  rotateLeft() {
-    let q: quat = quat.create();
-    quat.setAxisAngle(q, this.up, radians(-15));
-    quat.normalize(q, q);
-    vec3.transformQuat(this.orientation, this.orientation, q);
-    vec3.normalize(this.orientation, this.orientation);
-    vec3.transformQuat(this.right, this.right, q);
-    vec3.normalize(this.right, this.right);
-  }
-
-  rotateRight() {
-    let q: quat = quat.create();
-    quat.setAxisAngle(q, this.up, radians(15));
-    quat.normalize(q, q);
-    vec3.transformQuat(this.orientation, this.orientation, q);
-    vec3.normalize(this.orientation, this.orientation);
-    vec3.transformQuat(this.right, this.right, q);
-    vec3.normalize(this.right, this.right);
-  }
-
-  spinLeft() {
-    let q: quat = quat.create();
-    quat.setAxisAngle(q, this.orientation, radians(-15));
-    quat.normalize(q, q);
-    vec3.transformQuat(this.right, this.right, q);
-    vec3.normalize(this.right, this.right);
-    vec3.transformQuat(this.up, this.up, q);
-    vec3.normalize(this.up, this.up);
-  }
-
-  spinRight() {
-    let q: quat = quat.create();
-    quat.setAxisAngle(q, this.orientation, radians(15));
-    quat.normalize(q, q);
-    vec3.transformQuat(this.right, this.right, q);
-    vec3.normalize(this.right, this.right);
-    vec3.transformQuat(this.up, this.up, q);
-    vec3.normalize(this.up, this.up);
   }
 
   incr() {

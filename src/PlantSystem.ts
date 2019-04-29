@@ -1,6 +1,7 @@
 import {vec3, vec4, mat4} from 'gl-matrix';
 import PlantTurtle from './PlantTurtle';
 
+//NOT FOR THIS PROJECT
 class PlantSystem {
     axiom: string;
     iterations: number;

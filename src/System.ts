@@ -57,11 +57,12 @@ export interface Rule {
     children?: Rule[];
     childHi?: number;
     childLo?: number;
-    indexes?: number[];
+    
+    deleted: boolean;
 
-    //The iteration number this rule corresponds to
+    //The iteration number and index this rule corresponds to
     depth: number;
-    index: number;
+    indexes: number[];
 
     exp?(startIndex: number): Rule[];
     func?(): void;
@@ -73,6 +74,7 @@ export interface Rule {
 }
 
 export abstract class ExpRule implements Rule {
+    //Expansion rule
     s: string;
     params: number[];
     paramNames: string[];
@@ -80,8 +82,10 @@ export abstract class ExpRule implements Rule {
     childLo: number;
     childHi: number;
 
+    deleted = false;
+
     depth: number;
-    index: number;
+    indexes: number[];
 
     constructor(s: string, paramNames: string[], params: number[], depth: number, index: number) {
         this.s = s;
@@ -91,7 +95,8 @@ export abstract class ExpRule implements Rule {
         this.childLo = -1;
         this.childHi = -1;
         this.depth = depth;
-        this.index = index;
+        this.indexes = [];
+        this.indexes[depth] = index;
     }
 
     abstract exp(startIndex: number): Rule[];
@@ -103,10 +108,11 @@ export abstract class FnRule implements Rule {
     s: string;
     params: number[];
     paramNames: string[];
-    indexes: number[];
+
+    deleted = false;
 
     depth: number;
-    index: number;
+    indexes: number[];
 
     constructor(s: string, paramNames: string[], params: number[], depth: number, index: number) {
         this.s = s;
@@ -115,7 +121,7 @@ export abstract class FnRule implements Rule {
         this.indexes = [];
         this.indexes[depth] = index;
         this.depth = depth;
-        this.index = index;
+        this.indexes[depth] = index;
     }
 
     abstract func(): void;
@@ -125,16 +131,14 @@ export abstract class FnRule implements Rule {
 
 class Flower extends ExpRule {
     seedLength: number;
-    angle: number;
     numPetals: number;
     curve: number;
     static count: number = 0;
 
-    constructor(depth: number, index: number, seedLength: number, angle: number, numPetals: number, curve: number) {
-        super("Flower" + Flower.count++, ["Seed Length", "Angle", "Num Petals", "Curve"], 
-            [seedLength, angle, numPetals, curve], depth, index);
-        this.seedLength = seedLength
-        this.angle = angle;
+    constructor(depth: number, index: number, seedLength: number, numPetals: number, curve: number) {
+        super("Flower" + Flower.count++, ["Seed Length", "Num Petals", "Curve"], 
+            [seedLength, numPetals, curve], depth, index);
+        this.seedLength = seedLength;
         this.numPetals = numPetals;
         this.curve = curve;
     }
@@ -148,7 +152,7 @@ class Flower extends ExpRule {
         for(let curr = 0; curr < 360; curr += 360 / this.numPetals) {
             target.push(new Rotate(this.depth + 1, startIndex + target.length, 1, angle));
             target.push(new Save(this.depth + 1, startIndex + target.length));
-            target.push(new Petal(this.depth + 1, startIndex + target.length, this.seedLength, this.angle, this.curve));
+            target.push(new Petal(this.depth + 1, startIndex + target.length, this.seedLength, this.curve));
             target.push(new Load(this.depth + 1, startIndex + target.length));
         }
 
@@ -165,10 +169,8 @@ class Flower extends ExpRule {
         if(paramNum == 0) {
             this.seedLength = newValue;
         } else if(paramNum == 1) {
-            this.angle = newValue;
-        } else if(paramNum == 2) {
             this.numPetals = newValue;
-        } else if(paramNum == 3) {
+        } else if(paramNum == 2) {
             this.curve = newValue;
         }
     }
@@ -176,14 +178,12 @@ class Flower extends ExpRule {
 
 class Petal extends ExpRule {
     seedLength: number;
-    angle: number;
     curve: number;
     static count: number = 0;
 
-    constructor(depth: number, index: number, seedLength: number, angle: number, curve: number) {
-        super("Petal" + Petal.count++, ["Seed Length", "Angle", "Curve"], [seedLength, angle, curve], depth, index);
+    constructor(depth: number, index: number, seedLength: number, curve: number) {
+        super("Petal" + Petal.count++, ["Seed Length", "Curve"], [seedLength, curve], depth, index);
         this.seedLength = seedLength
-        this.angle = angle;
         this.curve = curve;
     }
 
@@ -215,8 +215,6 @@ class Petal extends ExpRule {
         if(paramNum == 0) {
             this.seedLength = newValue;
         } else if(paramNum == 1) {
-            this.angle = newValue;
-        } else if(paramNum == 2) {
             this.curve = newValue;
         }
     }
@@ -1086,6 +1084,18 @@ class Load extends FnRule {
     changeParam(paramNum: number, newValue: number) {}
 }
 
+export class Null extends FnRule {
+    constructor(depth: number, index: number) {
+        super("", [], [], depth, index);
+    }
+
+    func() {}
+
+    setName() {}
+
+    changeParam(paramNum: number, newValue: number) {}
+}
+
 export class System {
     axiom: Rule[];
     currDepth: number;
@@ -1106,14 +1116,14 @@ export class System {
         let r: Rule;
         if(scene == 1) {
             turtle.color = vec4.fromValues(0.5, 1, 0.5, 1);
-            r = new Building(0, 0, 10, 30, 5, 1);
+            r = new Building(0, 0, 10, 20, 5, 1);
             this.axiom.push(r);
             this.current.push(r);
         } else if(scene == 2) {
             r = new Trunk(0, 0, 10, 6, 0.6, 5);
             this.axiom.push(r);
             this.current.push(r);
-            r = new Flower(0, 1, 1.5, 75, 24, 0.7);
+            r = new Flower(0, 1, 1.5, 24, 0.7);
             this.axiom.push(r);
             this.current.push(r);
         }
@@ -1125,6 +1135,7 @@ export class System {
 
     expand(iterations: number) {
         for(let x = 0; x < iterations; x++) {
+            debugger;
             let newExp = [];
             for(let i = 0; i < this.current.length; i++) {
                 //Add the expansion if it exists
@@ -1208,12 +1219,12 @@ export class System {
         if(rule.depth == this.currDepth || rule instanceof FnRule) {
             return;
         }
-        let parentLo = rule.index;
-        let parentHi = rule.index;
+        debugger;
+        let parentLo = rule.indexes[rule.depth];
+        let parentHi = rule.indexes[rule.depth];
         let currLo = rule.childLo;
         let currHi = rule.childHi;
         for(let depth = rule.depth + 1; depth <= this.currDepth; depth++) {
-            debugger;
             let lo = this.expHistory[depth][currLo];
             let hi = this.expHistory[depth][currHi];
             let nextRemoveLo = lo.childLo;
@@ -1243,19 +1254,18 @@ export class System {
                     index += exp.length;
                 }
             }
-            debugger;
             //Remove the elements that are to be changed
             this.expHistory[depth].splice(index, currHi - currLo + 1);
             
             let addend = (index - startIndex) - (currHi - currLo + 1);
-            //NOT CHANGING CURRENT INDEX
             for(let i = parentHi + 1; i < this.expHistory[depth - 1].length; i++) {
                 let r = this.expHistory[depth - 1][i];
+                if(depth < r.indexes.length) {
+                    r.indexes[depth] += addend;
+                }
                 if(r.childLo && r.childHi) {
                     r.childLo += addend;
                     r.childHi += addend;
-                } else if(r.indexes && depth < r.indexes.length) {
-                    r.indexes[depth] += addend;
                 }
             }
             parentLo = startIndex;
